@@ -25,153 +25,6 @@ import org.zeromq.api.Message;
  */
 public interface MlmServerHandler {
     /**
-     * Register new client.
-     *
-     * @param client Handle to the current client
-     */
-    void registerNewClient(MlmServerAgent.Client client);
-
-    /**
-     * Send.
-     *
-     * @param client Handle to the current client
-     */
-    void send(MlmServerAgent.Client client);
-
-    /**
-     * Check for mailbox messages.
-     *
-     * @param client Handle to the current client
-     */
-    void checkForMailboxMessages(MlmServerAgent.Client client);
-
-    /**
-     * Signal command invalid.
-     *
-     * @param client Handle to the current client
-     */
-    void signalCommandInvalid(MlmServerAgent.Client client);
-
-    /**
-     * Store stream writer.
-     *
-     * @param client Handle to the current client
-     */
-    void storeStreamWriter(MlmServerAgent.Client client);
-
-    /**
-     * Store stream reader.
-     *
-     * @param client Handle to the current client
-     */
-    void storeStreamReader(MlmServerAgent.Client client);
-
-    /**
-     * Cancel stream reader.
-     *
-     * @param client Handle to the current client
-     */
-    void cancelStreamReader(MlmServerAgent.Client client);
-
-    /**
-     * Write message to stream.
-     *
-     * @param client Handle to the current client
-     */
-    void writeMessageToStream(MlmServerAgent.Client client);
-
-    /**
-     * Write message to mailbox.
-     *
-     * @param client Handle to the current client
-     */
-    void writeMessageToMailbox(MlmServerAgent.Client client);
-
-    /**
-     * Write message to service.
-     *
-     * @param client Handle to the current client
-     */
-    void writeMessageToService(MlmServerAgent.Client client);
-
-    /**
-     * Store service offer.
-     *
-     * @param client Handle to the current client
-     */
-    void storeServiceOffer(MlmServerAgent.Client client);
-
-    /**
-     * Dispatch the service.
-     *
-     * @param client Handle to the current client
-     */
-    void dispatchTheService(MlmServerAgent.Client client);
-
-    /**
-     * Have message confirmation.
-     *
-     * @param client Handle to the current client
-     */
-    void haveMessageConfirmation(MlmServerAgent.Client client);
-
-    /**
-     * Credit the client.
-     *
-     * @param client Handle to the current client
-     */
-    void creditTheClient(MlmServerAgent.Client client);
-
-    /**
-     * Client closed connection.
-     *
-     * @param client Handle to the current client
-     */
-    void clientClosedConnection(MlmServerAgent.Client client);
-
-    /**
-     * Deregister the client.
-     *
-     * @param client Handle to the current client
-     */
-    void deregisterTheClient(MlmServerAgent.Client client);
-
-    /**
-     * Terminate.
-     *
-     * @param client Handle to the current client
-     */
-    void terminate(MlmServerAgent.Client client);
-
-    /**
-     * Get message to deliver.
-     *
-     * @param client Handle to the current client
-     */
-    void getMessageToDeliver(MlmServerAgent.Client client);
-
-    /**
-     * Client expired.
-     *
-     * @param client Handle to the current client
-     */
-    void clientExpired(MlmServerAgent.Client client);
-
-    /**
-     * Signal operation failed.
-     *
-     * @param client Handle to the current client
-     */
-    void signalOperationFailed(MlmServerAgent.Client client);
-
-    /**
-     * Client had exception.
-     *
-     * @param client Handle to the current client
-     */
-    void clientHadException(MlmServerAgent.Client client);
-
-    /**
      * Handle a custom command from the application.
      *
      * @param command The command to execute
@@ -179,4 +32,144 @@ public interface MlmServerHandler {
      * @return A reply to send
      */
     Message handleCommand(String command, Message message);
+
+    /**
+     * Handle "register new client" action.
+     *
+     * @param client Handle to the current client
+     */
+    void registerNewClient(MlmServerAgent.Client client);
+
+    /**
+     * Handle "check for mailbox messages" action.
+     *
+     * @param client Handle to the current client
+     */
+    void checkForMailboxMessages(MlmServerAgent.Client client);
+
+    /**
+     * Handle "signal command invalid" action.
+     *
+     * @param client Handle to the current client
+     */
+    void signalCommandInvalid(MlmServerAgent.Client client);
+
+    /**
+     * Handle "store stream writer" action.
+     *
+     * @param client Handle to the current client
+     */
+    void storeStreamWriter(MlmServerAgent.Client client);
+
+    /**
+     * Handle "store stream reader" action.
+     *
+     * @param client Handle to the current client
+     */
+    void storeStreamReader(MlmServerAgent.Client client);
+
+    /**
+     * Handle "cancel stream reader" action.
+     *
+     * @param client Handle to the current client
+     */
+    void cancelStreamReader(MlmServerAgent.Client client);
+
+    /**
+     * Handle "write message to stream" action.
+     *
+     * @param client Handle to the current client
+     */
+    void writeMessageToStream(MlmServerAgent.Client client);
+
+    /**
+     * Handle "write message to mailbox" action.
+     *
+     * @param client Handle to the current client
+     */
+    void writeMessageToMailbox(MlmServerAgent.Client client);
+
+    /**
+     * Handle "write message to service" action.
+     *
+     * @param client Handle to the current client
+     */
+    void writeMessageToService(MlmServerAgent.Client client);
+
+    /**
+     * Handle "store service offer" action.
+     *
+     * @param client Handle to the current client
+     */
+    void storeServiceOffer(MlmServerAgent.Client client);
+
+    /**
+     * Handle "dispatch service" action.
+     *
+     * @param client Handle to the current client
+     */
+    void dispatchService(MlmServerAgent.Client client);
+
+    /**
+     * Handle "on message confirmation" action.
+     *
+     * @param client Handle to the current client
+     */
+    void onMessageConfirmation(MlmServerAgent.Client client);
+
+    /**
+     * Handle "on credit client request" action.
+     *
+     * @param client Handle to the current client
+     */
+    void onCreditClientRequest(MlmServerAgent.Client client);
+
+    /**
+     * Handle "on client closed connection" action.
+     *
+     * @param client Handle to the current client
+     */
+    void onClientClosedConnection(MlmServerAgent.Client client);
+
+    /**
+     * Handle "deregister client" action.
+     *
+     * @param client Handle to the current client
+     */
+    void deregisterClient(MlmServerAgent.Client client);
+
+    /**
+     * Handle "terminate" action.
+     *
+     * @param client Handle to the current client
+     */
+    void terminate(MlmServerAgent.Client client);
+
+    /**
+     * Handle "get message to deliver" action.
+     *
+     * @param client Handle to the current client
+     */
+    void getMessageToDeliver(MlmServerAgent.Client client);
+
+    /**
+     * Handle "on client expired" action.
+     *
+     * @param client Handle to the current client
+     */
+    void onClientExpired(MlmServerAgent.Client client);
+
+    /**
+     * Handle "signal operation failed" action.
+     *
+     * @param client Handle to the current client
+     */
+    void signalOperationFailed(MlmServerAgent.Client client);
+
+    /**
+     * Handle "on client exception" action.
+     *
+     * @param client Handle to the current client
+     */
+    void onClientException(MlmServerAgent.Client client);
 }

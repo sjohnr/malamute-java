@@ -425,8 +425,8 @@ public class MlmServerAgent {
                             }
                             case CONNECTION_CLOSE: {
                                 socket.send(socket.getCodec().getOk());
-                                handler.clientClosedConnection(client);
-                                handler.deregisterTheClient(client);
+                                handler.onClientClosedConnection(client);
+                                handler.deregisterClient(client);
                                 handler.terminate(client);
                                 break;
                             }
@@ -450,16 +450,16 @@ public class MlmServerAgent {
                                 break;
                             }
                             case EXPIRED: {
-                                handler.clientExpired(client);
-                                handler.deregisterTheClient(client);
+                                handler.onClientExpired(client);
+                                handler.deregisterClient(client);
                                 handler.terminate(client);
                                 break;
                             }
                             case EXCEPTION: {
                                 handler.signalOperationFailed(client);
                                 socket.send(socket.getCodec().getError());
-                                handler.clientHadException(client);
-                                handler.deregisterTheClient(client);
+                                handler.onClientException(client);
+                                handler.deregisterClient(client);
                                 handler.terminate(client);
                                 break;
                             }
@@ -497,15 +497,15 @@ public class MlmServerAgent {
                             case SERVICE_OFFER: {
                                 handler.storeServiceOffer(client);
                                 socket.send(socket.getCodec().getOk());
-                                handler.dispatchTheService(client);
+                                handler.dispatchService(client);
                                 break;
                             }
                             case CONFIRM: {
-                                handler.haveMessageConfirmation(client);
+                                handler.onMessageConfirmation(client);
                                 break;
                             }
                             case CREDIT: {
-                                handler.creditTheClient(client);
+                                handler.onCreditClientRequest(client);
                                 break;
                             }
                             case CONNECTION_PING: {
@@ -514,8 +514,8 @@ public class MlmServerAgent {
                             }
                             case CONNECTION_CLOSE: {
                                 socket.send(socket.getCodec().getOk());
-                                handler.clientClosedConnection(client);
-                                handler.deregisterTheClient(client);
+                                handler.onClientClosedConnection(client);
+                                handler.deregisterClient(client);
                                 handler.terminate(client);
                                 break;
                             }
@@ -539,23 +539,23 @@ public class MlmServerAgent {
                                 break;
                             }
                             case EXPIRED: {
-                                handler.clientExpired(client);
-                                handler.deregisterTheClient(client);
+                                handler.onClientExpired(client);
+                                handler.deregisterClient(client);
                                 handler.terminate(client);
                                 break;
                             }
                             case EXCEPTION: {
                                 handler.signalOperationFailed(client);
                                 socket.send(socket.getCodec().getError());
-                                handler.clientHadException(client);
-                                handler.deregisterTheClient(client);
+                                handler.onClientException(client);
+                                handler.deregisterClient(client);
                                 handler.terminate(client);
                                 break;
                             }
                             default: {
                                 handler.signalCommandInvalid(client);
                                 socket.send(socket.getCodec().getError());
-                                handler.deregisterTheClient(client);
+                                handler.deregisterClient(client);
                                 handler.terminate(client);
                                 break;
                             }

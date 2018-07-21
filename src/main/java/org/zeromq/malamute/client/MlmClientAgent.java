@@ -64,6 +64,8 @@ public class MlmClientAgent {
     public MlmClientAgent(Context context, MlmClientHandler handler) {
         this.context = context;
         this.handler = handler;
+
+        handler.setMlmClientAgent(this);
     }
 
     /**
@@ -544,42 +546,42 @@ public class MlmClientAgent {
                     case START:
                         switch (event) {
                             case SET_PLAIN_AUTH: {
-                                handler.usePlainSecurityMechanism(this);
-                                handler.signalSuccess(this);
+                                handler.usePlainSecurityMechanism();
+                                handler.signalSuccess();
                                 break;
                             }
                             case CONNECT: {
-                                handler.rememberClientAddress(this);
-                                handler.connectToServerEndpoint(this);
-                                handler.setClientAddress(this);
-                                handler.useConnectTimeout(this);
+                                handler.rememberClientAddress();
+                                handler.connectToServerEndpoint();
+                                handler.setClientAddress();
+                                handler.useConnectTimeout();
                                 socket.send(socket.getCodec().getConnectionOpen());
                                 state = State.CONNECTING;
                                 break;
                             }
                             case BAD_ENDPOINT: {
-                                handler.signalBadEndpoint(this);
+                                handler.signalBadEndpoint();
                                 break;
                             }
                             case DESTRUCTOR: {
-                                handler.signalSuccess(this);
-                                handler.terminate(this);
+                                handler.signalSuccess();
+                                handler.terminate();
                                 break;
                             }
                             case SET_PRODUCER: {
-                                handler.signalFailure(this);
+                                handler.signalFailure();
                                 break;
                             }
                             case SET_CONSUMER: {
-                                handler.signalFailure(this);
+                                handler.signalFailure();
                                 break;
                             }
                             case REMOVE_CONSUMER: {
-                                handler.signalFailure(this);
+                                handler.signalFailure();
                                 break;
                             }
                             case SET_WORKER: {
-                                handler.signalFailure(this);
+                                handler.signalFailure();
                                 break;
                             }
                             default: {
@@ -590,13 +592,13 @@ public class MlmClientAgent {
                     case CONNECTING:
                         switch (event) {
                             case OK: {
-                                handler.clientIsConnected(this);
-                                handler.signalSuccess(this);
+                                handler.onClientIsConnected();
+                                handler.signalSuccess();
                                 state = State.CONNECTED;
                                 break;
                             }
                             case EXPIRED: {
-                                handler.signalServerNotPresent(this);
+                                handler.signalServerNotPresent();
                                 state = State.START;
                                 break;
                             }
@@ -605,13 +607,13 @@ public class MlmClientAgent {
                                 break;
                             }
                             case CONNECTION_PONG: {
-                                handler.clientIsConnected(this);
+                                handler.onClientIsConnected();
                                 state = State.CONNECTED;
                                 break;
                             }
                             case ERROR: {
-                                handler.checkStatusCode(this);
-                                state = State.HAVE_ERROR;
+                                handler.checkStatusCode();
+                                state = State.HAS_ERROR;
                                 break;
                             }
                             default: {
@@ -622,25 +624,25 @@ public class MlmClientAgent {
                     case CONNECTED:
                         switch (event) {
                             case SET_PRODUCER: {
-                                handler.prepareStreamWriteCommand(this);
+                                handler.prepareStreamWriteCommand();
                                 socket.send(socket.getCodec().getStreamWrite());
                                 state = State.CONFIRMING;
                                 break;
                             }
                             case SET_CONSUMER: {
-                                handler.prepareStreamReadCommand(this);
+                                handler.prepareStreamReadCommand();
                                 socket.send(socket.getCodec().getStreamRead());
                                 state = State.CONFIRMING;
                                 break;
                             }
                             case REMOVE_CONSUMER: {
-                                handler.prepareStreamCancelCommand(this);
+                                handler.prepareStreamCancelCommand();
                                 socket.send(socket.getCodec().getStreamCancel());
                                 state = State.CONFIRMING;
                                 break;
                             }
                             case SET_WORKER: {
-                                handler.prepareServiceOfferCommand(this);
+                                handler.prepareServiceOfferCommand();
                                 socket.send(socket.getCodec().getServiceOffer());
                                 state = State.CONFIRMING;
                                 break;
@@ -651,7 +653,7 @@ public class MlmClientAgent {
                                 break;
                             }
                             case BAD_PATTERN: {
-                                handler.signalBadPattern(this);
+                                handler.signalBadPattern();
                                 break;
                             }
                             case STREAM_DELIVER: {
@@ -688,18 +690,18 @@ public class MlmClientAgent {
                                 break;
                             }
                             case CONNECTION_PONG: {
-                                handler.clientIsConnected(this);
+                                handler.onClientIsConnected();
                                 state = State.CONNECTED;
                                 break;
                             }
                             case EXPIRED: {
-                                handler.serverHasGoneOffline(this);
+                                handler.onServerHasGoneOffline();
                                 state = State.DISCONNECTED;
                                 break;
                             }
                             case ERROR: {
-                                handler.checkStatusCode(this);
-                                state = State.HAVE_ERROR;
+                                handler.checkStatusCode();
+                                state = State.HAS_ERROR;
                                 break;
                             }
                             default: {
@@ -710,35 +712,35 @@ public class MlmClientAgent {
                     case CONFIRMING:
                         switch (event) {
                             case EXPIRED: {
-                                handler.serverHasGoneOffline(this);
-                                handler.signalFailure(this);
+                                handler.onServerHasGoneOffline();
+                                handler.signalFailure();
                                 state = State.DISCONNECTED;
                                 break;
                             }
                             case OK: {
-                                handler.signalSuccess(this);
+                                handler.signalSuccess();
                                 state = State.CONNECTED;
                                 break;
                             }
                             case ERROR: {
-                                handler.signalFailure(this);
-                                handler.checkStatusCode(this);
-                                state = State.HAVE_ERROR;
+                                handler.signalFailure();
+                                handler.checkStatusCode();
+                                state = State.HAS_ERROR;
                                 break;
                             }
                             case CONNECTION_PONG: {
                                 break;
                             }
                             case STREAM_DELIVER: {
-                                handler.passStreamMessageToApp(this);
+                                handler.passStreamMessageToApp();
                                 break;
                             }
                             case MAILBOX_DELIVER: {
-                                handler.passMailboxMessageToApp(this);
+                                handler.passMailboxMessageToApp();
                                 break;
                             }
                             case SERVICE_DELIVER: {
-                                handler.passServiceMessageToApp(this);
+                                handler.passServiceMessageToApp();
                                 break;
                             }
                             case HEARTBEAT: {
@@ -753,21 +755,21 @@ public class MlmClientAgent {
                     case TERMINATING:
                         switch (event) {
                             case OK: {
-                                handler.signalSuccess(this);
-                                handler.terminate(this);
+                                handler.signalSuccess();
+                                handler.terminate();
                                 break;
                             }
                             case EXPIRED: {
-                                handler.signalFailure(this);
-                                handler.terminate(this);
+                                handler.signalFailure();
+                                handler.terminate();
                                 break;
                             }
                             case CONNECTION_PONG: {
                                 break;
                             }
                             case ERROR: {
-                                handler.signalFailure(this);
-                                handler.terminate(this);
+                                handler.signalFailure();
+                                handler.terminate();
                                 break;
                             }
                             case HEARTBEAT: {
@@ -782,8 +784,8 @@ public class MlmClientAgent {
                     case RECONNECTING:
                         switch (event) {
                             case OK: {
-                                handler.clientIsConnected(this);
-                                handler.getFirstReplayCommand(this);
+                                handler.onClientIsConnected();
+                                handler.getFirstReplayCommand();
                                 break;
                             }
                             case ERROR: {
@@ -791,26 +793,26 @@ public class MlmClientAgent {
                             }
                             case SET_PRODUCER: {
                                 socket.send(socket.getCodec().getStreamWrite());
-                                handler.getNextReplayCommand(this);
+                                handler.getNextReplayCommand();
                                 break;
                             }
                             case SET_CONSUMER: {
                                 socket.send(socket.getCodec().getStreamRead());
-                                handler.getNextReplayCommand(this);
+                                handler.getNextReplayCommand();
                                 break;
                             }
                             case REMOVE_CONSUMER: {
                                 socket.send(socket.getCodec().getStreamCancel());
-                                handler.getNextReplayCommand(this);
+                                handler.getNextReplayCommand();
                                 break;
                             }
                             case SET_WORKER: {
                                 socket.send(socket.getCodec().getServiceOffer());
-                                handler.getNextReplayCommand(this);
+                                handler.getNextReplayCommand();
                                 break;
                             }
                             case REPLAY_READY: {
-                                handler.clientIsConnected(this);
+                                handler.onClientIsConnected();
                                 state = State.CONNECTED;
                                 break;
                             }
@@ -822,7 +824,7 @@ public class MlmClientAgent {
                                 break;
                             }
                             case EXPIRED: {
-                                handler.serverHasGoneOffline(this);
+                                handler.onServerHasGoneOffline();
                                 state = State.DISCONNECTED;
                                 break;
                             }
@@ -834,24 +836,24 @@ public class MlmClientAgent {
                     case DISCONNECTED:
                         switch (event) {
                             case SET_PRODUCER: {
-                                handler.signalFailure(this);
+                                handler.signalFailure();
                                 break;
                             }
                             case SET_CONSUMER: {
-                                handler.signalFailure(this);
+                                handler.signalFailure();
                                 break;
                             }
                             case REMOVE_CONSUMER: {
-                                handler.signalFailure(this);
+                                handler.signalFailure();
                                 break;
                             }
                             case SET_WORKER: {
-                                handler.signalFailure(this);
+                                handler.signalFailure();
                                 break;
                             }
                             case DESTRUCTOR: {
-                                handler.signalSuccess(this);
-                                handler.terminate(this);
+                                handler.signalSuccess();
+                                handler.terminate();
                                 break;
                             }
                             case HEARTBEAT: {
@@ -859,18 +861,18 @@ public class MlmClientAgent {
                                 break;
                             }
                             case CONNECTION_PONG: {
-                                handler.clientIsConnected(this);
+                                handler.onClientIsConnected();
                                 state = State.CONNECTED;
                                 break;
                             }
                             case EXPIRED: {
-                                handler.serverHasGoneOffline(this);
+                                handler.onServerHasGoneOffline();
                                 state = State.DISCONNECTED;
                                 break;
                             }
                             case ERROR: {
-                                handler.checkStatusCode(this);
-                                state = State.HAVE_ERROR;
+                                handler.checkStatusCode();
+                                state = State.HAS_ERROR;
                                 break;
                             }
                             default: {
@@ -878,23 +880,23 @@ public class MlmClientAgent {
                             }
                         }
                         break;
-                    case HAVE_ERROR:
+                    case HAS_ERROR:
                         switch (event) {
                             case COMMAND_INVALID: {
-                                handler.setClientAddress(this);
-                                handler.useConnectTimeout(this);
+                                handler.setClientAddress();
+                                handler.useConnectTimeout();
                                 socket.send(socket.getCodec().getConnectionOpen());
                                 state = State.RECONNECTING;
                                 break;
                             }
                             case FAILED: {
-                                handler.signalFailure(this);
-                                handler.terminate(this);
+                                handler.signalFailure();
+                                handler.terminate();
                                 break;
                             }
                             case OTHER: {
-                                handler.announceUnhandledError(this);
-                                handler.terminate(this);
+                                handler.announceUnhandledError();
+                                handler.terminate();
                                 break;
                             }
                         }
@@ -917,7 +919,7 @@ public class MlmClientAgent {
         TERMINATING,
         RECONNECTING,
         DISCONNECTED,
-        HAVE_ERROR
+        HAS_ERROR
     }
 
     /**

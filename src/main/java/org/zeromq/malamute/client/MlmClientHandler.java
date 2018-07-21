@@ -23,184 +23,129 @@ package org.zeromq.malamute.client;
  */
 public interface MlmClientHandler {
     /**
-     * Use plain security mechanism.
+     * Set a reference to the MlmClientAgent.
      *
      * @param agent Handle to the background agent
      */
-    void usePlainSecurityMechanism(MlmClientAgent agent);
+    void setMlmClientAgent(MlmClientAgent agent);
 
     /**
-     * Signal success.
-     *
-     * @param agent Handle to the background agent
+     * Handle "use plain security mechanism" action.
      */
-    void signalSuccess(MlmClientAgent agent);
+    void usePlainSecurityMechanism();
 
     /**
-     * Remember client address.
-     *
-     * @param agent Handle to the background agent
+     * Handle "signal success" action.
      */
-    void rememberClientAddress(MlmClientAgent agent);
+    void signalSuccess();
 
     /**
-     * Connect to server endpoint.
-     *
-     * @param agent Handle to the background agent
+     * Handle "remember client address" action.
      */
-    void connectToServerEndpoint(MlmClientAgent agent);
+    void rememberClientAddress();
 
     /**
-     * Set client address.
-     *
-     * @param agent Handle to the background agent
+     * Handle "connect to server endpoint" action.
      */
-    void setClientAddress(MlmClientAgent agent);
+    void connectToServerEndpoint();
 
     /**
-     * Use connect timeout.
-     *
-     * @param agent Handle to the background agent
+     * Handle "set client address" action.
      */
-    void useConnectTimeout(MlmClientAgent agent);
+    void setClientAddress();
 
     /**
-     * Send.
-     *
-     * @param agent Handle to the background agent
+     * Handle "use connect timeout" action.
      */
-    void send(MlmClientAgent agent);
+    void useConnectTimeout();
 
     /**
-     * Signal bad endpoint.
-     *
-     * @param agent Handle to the background agent
+     * Handle "signal bad endpoint" action.
      */
-    void signalBadEndpoint(MlmClientAgent agent);
+    void signalBadEndpoint();
 
     /**
-     * Terminate.
-     *
-     * @param agent Handle to the background agent
+     * Handle "terminate" action.
      */
-    void terminate(MlmClientAgent agent);
+    void terminate();
 
     /**
-     * Signal failure.
-     *
-     * @param agent Handle to the background agent
+     * Handle "signal failure" action.
      */
-    void signalFailure(MlmClientAgent agent);
+    void signalFailure();
 
     /**
-     * Client is connected.
-     *
-     * @param agent Handle to the background agent
+     * Handle "on client is connected" action.
      */
-    void clientIsConnected(MlmClientAgent agent);
+    void onClientIsConnected();
 
     /**
-     * Signal server not present.
-     *
-     * @param agent Handle to the background agent
+     * Handle "signal server not present" action.
      */
-    void signalServerNotPresent(MlmClientAgent agent);
+    void signalServerNotPresent();
 
     /**
-     * Prepare stream write command.
-     *
-     * @param agent Handle to the background agent
+     * Handle "prepare stream write command" action.
      */
-    void prepareStreamWriteCommand(MlmClientAgent agent);
+    void prepareStreamWriteCommand();
 
     /**
-     * Prepare stream read command.
-     *
-     * @param agent Handle to the background agent
+     * Handle "prepare stream read command" action.
      */
-    void prepareStreamReadCommand(MlmClientAgent agent);
+    void prepareStreamReadCommand();
 
     /**
-     * Prepare stream cancel command.
-     *
-     * @param agent Handle to the background agent
+     * Handle "prepare stream cancel command" action.
      */
-    void prepareStreamCancelCommand(MlmClientAgent agent);
+    void prepareStreamCancelCommand();
 
     /**
-     * Prepare service offer command.
-     *
-     * @param agent Handle to the background agent
+     * Handle "prepare service offer command" action.
      */
-    void prepareServiceOfferCommand(MlmClientAgent agent);
+    void prepareServiceOfferCommand();
 
     /**
-     * Signal bad pattern.
-     *
-     * @param agent Handle to the background agent
+     * Handle "signal bad pattern" action.
      */
-    void signalBadPattern(MlmClientAgent agent);
+    void signalBadPattern();
 
     /**
-     * Recv.
-     *
-     * @param agent Handle to the background agent
+     * Handle "on server has gone offline" action.
      */
-    void recv(MlmClientAgent agent);
+    void onServerHasGoneOffline();
 
     /**
-     * Server has gone offline.
-     *
-     * @param agent Handle to the background agent
+     * Handle "check status code" action.
      */
-    void serverHasGoneOffline(MlmClientAgent agent);
+    void checkStatusCode();
 
     /**
-     * Check status code.
-     *
-     * @param agent Handle to the background agent
+     * Handle "pass stream message to app" action.
      */
-    void checkStatusCode(MlmClientAgent agent);
+    void passStreamMessageToApp();
 
     /**
-     * Pass stream message to app.
-     *
-     * @param agent Handle to the background agent
+     * Handle "pass mailbox message to app" action.
      */
-    void passStreamMessageToApp(MlmClientAgent agent);
+    void passMailboxMessageToApp();
 
     /**
-     * Pass mailbox message to app.
-     *
-     * @param agent Handle to the background agent
+     * Handle "pass service message to app" action.
      */
-    void passMailboxMessageToApp(MlmClientAgent agent);
+    void passServiceMessageToApp();
 
     /**
-     * Pass service message to app.
-     *
-     * @param agent Handle to the background agent
+     * Handle "get first replay command" action.
      */
-    void passServiceMessageToApp(MlmClientAgent agent);
+    void getFirstReplayCommand();
 
     /**
-     * Get first replay command.
-     *
-     * @param agent Handle to the background agent
+     * Handle "get next replay command" action.
      */
-    void getFirstReplayCommand(MlmClientAgent agent);
+    void getNextReplayCommand();
 
     /**
-     * Get next replay command.
-     *
-     * @param agent Handle to the background agent
+     * Handle "announce unhandled error" action.
      */
-    void getNextReplayCommand(MlmClientAgent agent);
-
-    /**
-     * Announce unhandled error.
-     *
-     * @param agent Handle to the background agent
-     */
-    void announceUnhandledError(MlmClientAgent agent);
+    void announceUnhandledError();
 }

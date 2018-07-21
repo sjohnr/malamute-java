@@ -48,13 +48,13 @@
         <event name = "SERVICE OFFER">
             <action name = "store service offer" />
             <action name = "send" message = "OK" />
-            <action name = "dispatch the service" />
+            <action name = "dispatch service" />
         </event>
         <event name = "CONFIRM">
-            <action name = "have message confirmation" />
+            <action name = "on message confirmation" />
         </event>
         <event name = "CREDIT">
-            <action name = "credit the client" />
+            <action name = "on credit client request" />
         </event>
         <event name = "CONNECTION PING">
             <action name = "send" message = "CONNECTION PONG" />
@@ -64,8 +64,8 @@
     <state name = "defaults">
         <event name = "CONNECTION CLOSE">
             <action name = "send" message = "OK" />
-            <action name = "client closed connection" />
-            <action name = "deregister the client" />
+            <action name = "on client closed connection" />
+            <action name = "deregister client" />
             <action name = "terminate" />
         </event>
         <event name = "stream message" next = "connected">
@@ -83,23 +83,23 @@
         </event>
         <!-- This built-in event hits on a client timeout -->
         <event name = "expired">
-            <action name = "client expired" />
-            <action name = "deregister the client" />
+            <action name = "on client expired" />
+            <action name = "deregister client" />
             <action name = "terminate" />
         </event>
         <!-- Client tried to do something we don't allow yet -->
         <event name = "exception">
             <action name = "signal operation failed" />
             <action name = "send" message = "ERROR" />
-            <action name = "client had exception" />
-            <action name = "deregister the client" />
+            <action name = "on client exception" />
+            <action name = "deregister client" />
             <action name = "terminate" />
         </event>
         <!-- All other protocol messages are invalid -->
         <event name = "*">
             <action name = "signal command invalid" />
             <action name = "send" message = "ERROR" />
-            <action name = "deregister the client" />
+            <action name = "deregister client" />
             <action name = "terminate" />
         </event>
     </state>

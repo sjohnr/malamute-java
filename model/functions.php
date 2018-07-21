@@ -207,8 +207,9 @@ function get_all_actions($class) {
     foreach ($class->state as $state) {
         foreach ($state->event as $event) {
             foreach ($event->action as $action) {
-                if (!array_search((string) $action['name'], $actions)) {
-                    array_push($actions, (string) $action['name']);
+                $name = (string)$action['name'];
+                if ($name != 'send' && $name != 'recv' && !array_search($name, $actions)) {
+                    array_push($actions, $name);
                 }
             }
         }

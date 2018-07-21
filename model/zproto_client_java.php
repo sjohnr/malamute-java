@@ -88,6 +88,8 @@ public class <?php echo $client_class ?>Agent {
     public <?php echo $client_class ?>Agent(Context context, <?php echo $client_class ?>Handler handler) {
         this.context = context;
         this.handler = handler;
+
+        handler.set<?php echo $client_class ?>Agent(this);
     }
 
     /**
@@ -363,7 +365,7 @@ public class <?php echo $client_class ?>Agent {
                                 stop();
 <?php                     break; ?>
 <?php                 default: ?>
-                                handler.<?php echo jvar($action['name']) ?>(this);
+                                handler.<?php echo jvar($action['name']) ?>();
 <?php                     break; ?>
 <?php             endswitch; ?>
 <?php         endforeach; ?>
@@ -759,13 +761,17 @@ package <?php echo package($class['package']) ?>;
  * @author <?php echo nl(get_current_user()) ?>
  */
 public interface <?php echo $client_class ?>Handler {
-<?php foreach ($actions as $i => $action): ?>
-<?php echo !first($i) ? nl() : '' ?>
     /**
-     * <?php echo nl(ccomment($action)) ?>
+     * Set a reference to the <?php echo $client_class ?>Agent.
      *
      * @param agent Handle to the background agent
      */
-    void <?php echo jvar($action) ?>(<?php echo $client_class ?>Agent agent);
+    void set<?php echo $client_class ?>Agent(<?php echo $client_class ?>Agent agent);
+<?php foreach ($actions as $i => $action): ?>
+
+    /**
+     * Handle "<?php echo $action ?>" action.
+     */
+    void <?php echo jvar($action) ?>();
 <?php endforeach; ?>
 }

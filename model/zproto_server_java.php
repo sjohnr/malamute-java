@@ -675,16 +675,6 @@ import org.zeromq.api.Message;
  * @author <?php echo nl(get_current_user()) ?>
  */
 public interface <?php echo $server_class ?>Handler {
-<?php foreach ($actions as $i => $action): ?>
-<?php echo !first($i) ? nl() : '' ?>
-    /**
-     * <?php echo nl(ccomment($action)) ?>
-     *
-     * @param client Handle to the current client
-     */
-    void <?php echo jvar($action) ?>(<?php echo $server_class ?>Agent.Client client);
-<?php endforeach; ?>
-
     /**
      * Handle a custom command from the application.
      *
@@ -693,4 +683,13 @@ public interface <?php echo $server_class ?>Handler {
      * @return A reply to send
      */
     Message handleCommand(String command, Message message);
+<?php foreach ($actions as $i => $action): ?>
+
+    /**
+     * Handle "<?php echo $action ?>" action.
+     *
+     * @param client Handle to the current client
+     */
+    void <?php echo jvar($action) ?>(<?php echo $server_class ?>Agent.Client client);
+<?php endforeach; ?>
 }

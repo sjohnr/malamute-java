@@ -54,7 +54,7 @@
 
     <state name = "connecting" inherit = "defaults">
         <event name = "OK" next = "connected">
-            <action name = "client is connected" />
+            <action name = "on client is connected" />
             <action name = "signal success" />
         </event>
         <event name = "expired" next = "start">
@@ -98,13 +98,13 @@
 
     <state name = "confirming" inherit = "defaults">
         <event name = "expired" next = "disconnected">
-            <action name = "server has gone offline" />
+            <action name = "on server has gone offline" />
             <action name = "signal failure" />
         </event>
         <event name = "OK" next = "connected">
             <action name = "signal success" />
         </event>
-        <event name = "ERROR" next = "have error">
+        <event name = "ERROR" next = "has error">
             <action name = "signal failure" />
             <action name = "check status code" />
         </event>
@@ -144,7 +144,7 @@
     <!-- After server sends ERROR for our PING -->
     <state name = "reconnecting" inherit = "defaults">
         <event name = "OK">
-            <action name = "client is connected" />
+            <action name = "on client is connected" />
             <action name = "get first replay command" />
         </event>
         <event name = "ERROR">
@@ -168,7 +168,7 @@
             <action name = "get next replay command" />
         </event>
         <event name = "replay ready" next = "connected">
-            <action name = "client is connected" />
+            <action name = "on client is connected" />
         </event>
         <!-- if we receive PONG from server, we still need to wait until replay would finish -->
         <event name = "CONNECTION PONG">
@@ -205,12 +205,12 @@
             <action name = "send" message = "CONNECTION PING" />
         </event>
         <event name = "CONNECTION PONG" next = "connected">
-            <action name = "client is connected" />
+            <action name = "on client is connected" />
         </event>
         <event name = "expired" next = "disconnected">
-            <action name = "server has gone offline" />
+            <action name = "on server has gone offline" />
         </event>
-        <event name = "ERROR" next = "have error">
+        <event name = "ERROR" next = "has error">
             <action name = "check status code" />
         </event>
         <event name = "*">
@@ -218,7 +218,7 @@
         </event>
     </state>
 
-    <state name = "have error">
+    <state name = "has error">
         <event name = "command invalid" next = "reconnecting">
             <action name = "set client address" />
             <action name = "use connect timeout" />
