@@ -3,3 +3,4 @@ cp ../../jyre/model/library.gsl .
 cp ../../jyre/model/library_bnf.gsl .
 gsl -q -script:zmq_socket -author:$USER mlm_proto.xml
 php zproto_client_java.php mlm_client.xml
+php zproto_server_java.php mlm_server.xml

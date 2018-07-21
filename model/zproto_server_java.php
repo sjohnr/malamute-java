@@ -7,26 +7,22 @@ $class = read_xml($filename);
 $proto = read_xml($filepath . '/' . $class['protocol_class'] . '.xml');
 
 $path = $class['package'];
-$client_class = jclass($class['name']);
+$server_class = jclass($class['name']);
 $proto_class = jclass($proto['name']);
 $states = get_all_states($class);
 $events = get_all_events($class);
 $actions = get_all_actions($class);
 $messages = get_messages_by_name($proto);
-$fields = get_all_fields_by_name($class, $messages);
-$replies = get_replies_by_name($class);
-$recv = array_of($class->recv->message);
-$send = array_of($class->send->message);
 
 resolve_includes($class);
 create_directories($path);
 
 ?>
-<?php output("../src/main/java/${path}/${client_class}Agent.java") ?>
+<?php output("../src/main/java/${path}/${server_class}Agent.java") ?>
 /* =============================================================================
- * <?php echo $client_class ?>Agent.java
+ * <?php echo $server_class ?>Agent.java
  *
- * Generated class for <?php echo $client_class ?>.
+ * Generated class for <?php echo $server_class ?>.
  * -----------------------------------------------------------------------------
  * <?php echo nl(block_comment($class['license'])) ?>
  * =============================================================================
@@ -39,6 +35,7 @@ import org.zeromq.api.Context;
 import org.zeromq.api.LoopAdapter;
 import org.zeromq.api.LoopHandler;
 import org.zeromq.api.Message;
+import org.zeromq.api.Message.Frame;
 import org.zeromq.api.MessageFlag;
 import org.zeromq.api.Reactor;
 import org.zeromq.api.Socket;
@@ -48,44 +45,35 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * <?php echo $client_class ?>Agent class.
+ * <?php echo $server_class ?>Agent class.
  *
  * @author <?php echo nl(get_current_user()) ?>
  */
-public class <?php echo $client_class ?>Agent {
+public class <?php echo $server_class ?>Agent {
     // Structure of our class
-    private <?php echo $client_class ?>Handler handler;
+    private <?php echo $server_class ?>Handler handler;
     private Context context;
     private Reactor reactor;
     private Socket pipe;
-    private Socket inbox;
     private <?php echo $proto_class ?>Socket socket;
-    private State state = State.START;
-    private Event event;
-    private Event next;
-    private Event exception;
-    private Event wakeup;
-    private LoopHandler wakeupHandler;
+    private int port;
 <?php if (array_search('heartbeat', $events)): ?>
     private long heartbeat;
     private LoopHandler heartbeatHandler;
 <?php endif; ?>
-<?php if (array_search('expired', $events)): ?>
-    private long expiry;
-    private LoopHandler expiryHandler;
-<?php endif; ?>
     private boolean verbose = false;
     private boolean connected = false;
     private boolean terminated = false;
-    private Map<String, Object> parameters = new HashMap<>();
+    private int clientId;
+    private Map<String, Client> clients = new HashMap<>();
 
     /**
-     * Create a <?php echo $client_class ?>Agent.
+     * Create a <?php echo $server_class ?>Agent.
      *
      * @param context The ZeroMQ context
      * @param handler The application callback handler
      */
-    public <?php echo $client_class ?>Agent(Context context, <?php echo $client_class ?>Handler handler) {
+    public <?php echo $server_class ?>Agent(Context context, <?php echo $server_class ?>Handler handler) {
         this.context = context;
         this.handler = handler;
     }
@@ -94,20 +82,18 @@ public class <?php echo $client_class ?>Agent {
      * Start the client's background agent.
      */
     public void start() {
-        // Socket must be connected to a real endpoint in application code by
-        // message from client interface.
-        Socket dealer = context.buildSocket(SocketType.DEALER)
+        // Socket must be bound to a real endpoint in application code by
+        // message from server interface.
+        Socket router = context.buildSocket(SocketType.ROUTER)
             .withSendHighWatermark(Long.MAX_VALUE)
             .withReceiveHighWatermark(Long.MAX_VALUE)
-            .connect(String.format("inproc://dealer-%s", this.toString()));
+            .bind(String.format("inproc://router-%s", this.toString()));
 
         this.pipe = context.buildSocket(SocketType.PAIR).bind(String.format("inproc://pipe-%s", this.toString()));
-        this.inbox = context.buildSocket(SocketType.PAIR).bind(String.format("inproc://inbox-%s", this.toString()));
-        this.socket = new <?php echo $proto_class ?>Socket(dealer);
+        this.socket = new <?php echo $proto_class ?>Socket(router);
         this.reactor = context.buildReactor()
             .withInPollable(pipe, new PipeHandler())
-            .withInPollable(inbox, new InboxHandler())
-            .withInPollable(dealer, new DealerHandler())
+            .withInPollable(router, new RouterHandler())
             .build();
 
         // Start the reactor
@@ -118,95 +104,29 @@ public class <?php echo $client_class ?>Agent {
      * Stop the client's background agent and clean up references.
      */
     public void stop() {
-        state = State.START;
         try {
             reactor.stop();
             socket.close();
-            inbox.close();
             pipe.close();
         } finally {
+            clients.clear();
 <?php if (array_search('heartbeat', $events)): ?>
             heartbeatHandler = null;
 <?php endif; ?>
-<?php if (array_search('expired', $events)): ?>
-            expiryHandler = null;
-<?php endif; ?>
             pipe = null;
-            inbox = null;
             socket = null;
             reactor = null;
         }
     }
 
     /**
-     * Connect to a server using the given endpoint.
+     * Bind to a port using the given endpoint.
      *
-     * @param endpoint The server endpoint to connect to
+     * @param endpoint The endpoint to bind to
+     * @return The bound port
      */
-    public void connect(String endpoint) {
-        socket.getSocket().getZMQSocket().connect(endpoint);
-    }
-
-    /**
-     * @return The current state
-     */
-    public State getState() {
-        return state;
-    }
-
-    /**
-     * @return The current event being handled by the state machine
-     */
-    public Event getEvent() {
-        return event;
-    }
-
-    /**
-     * @return The next event to be handled by the state machine
-     */
-    public Event getNext() {
-        return next;
-    }
-
-    /**
-     * Set (trigger) the next event to be handled by the state machine.
-     * 
-     * @param next The next event
-     */
-    public void triggerEvent(Event next) {
-        this.next = next;
-    }
-
-    /**
-     * Raise an exception, halting any actions in progress.
-     * <p>
-     * Continues execution of actions defined for the exception event.
-     *
-     * @param event The exception event
-     */
-    public void setException(Event event) {
-        this.exception = event;
-        throw new HaltException();
-    }
-
-    /**
-     * Set a wakeup alarm.
-     * <p>
-     * The next state should handle the wakeup event. The alarm is cancelled on
-     * any other event.
-     *
-     * @param wakeup The wakeup timer in milliseconds
-     * @param event The event to trigger when the wakeup timer expires
-     */
-    public void setWakeupEvent(long wakeup, Event event) {
-        this.wakeup = event;
-        if (wakeupHandler != null) {
-            reactor.cancel(wakeupHandler);
-        }
-        if (wakeup > 0) {
-            wakeupHandler = new WakeupHandler();
-            reactor.addTimer(wakeup, 1, wakeupHandler);
-        }
+    public int bind(String endpoint) {
+        return socket.getSocket().getZMQSocket().bindToRandomPort(endpoint);
     }
 <?php if (array_search('heartbeat', $events)): ?>
 
@@ -225,42 +145,14 @@ public class <?php echo $client_class ?>Agent {
         this.heartbeat = heartbeat;
         if (heartbeatHandler != null) {
             reactor.cancel(heartbeatHandler);
+            heartbeatHandler = null;
         }
-        heartbeatHandler = new HeartbeatHandler();
-        reactor.addTimer(heartbeat, 1, heartbeatHandler);
-    }
-<?php endif; ?>
-<?php if (array_search('expired', $events)): ?>
-
-    /**
-     * Set an expiry timer.
-     * <p>
-     * Setting a non-zero expiry causes the state machine to receive an "expired"
-     * event if there is no incoming traffic for that many milliseconds.
-     * <p>
-     * This cycles over and over until/unless the code sets a zero expiry. The
-     * state machine must handle the "expired" event.
-     *
-     * @param expiry The expiry timer in milliseconds
-     */
-    public void setExpiry(long expiry) {
-        this.expiry = expiry;
-        if (expiryHandler != null) {
-            reactor.cancel(expiryHandler);
-        }
-        if (expiry > 0) {
-            expiryHandler = new ExpiryHandler();
-            reactor.addTimer(expiry, 1, expiryHandler);
+        if (heartbeat > 0) {
+            heartbeatHandler = new HeartbeatHandler();
+            reactor.addTimer(heartbeat, 1, heartbeatHandler);
         }
     }
 <?php endif; ?>
-
-    /**
-     * @return The parameters from an API call
-     */
-    public Map<String, Object> getParameters() {
-        return parameters;
-    }
 
     /**
      * @return The high level socket, connected to the server
@@ -313,58 +205,50 @@ public class <?php echo $client_class ?>Agent {
      *
      * @param triggeredEvent The current event to be processed
      */
-    private void executeInternal(Event triggeredEvent) {
-        next = triggeredEvent;
+    private void executeInternal(Client client, Event triggeredEvent) {
+        client.next = triggeredEvent;
 
         // Cancel wakeup timer, if any was pending
-        if (wakeupHandler != null) {
-            reactor.cancel(wakeupHandler);
-            wakeupHandler = null;
+        if (client.wakeupHandler != null) {
+            reactor.cancel(client.wakeupHandler);
+            client.wakeupHandler = null;
         }
 
-        while (!terminated && next != null) {
-            event = next;
-            next = null;
-            exception = null;
+        while (!terminated && client.next != null) {
+            client.event = client.next;
+            client.next = null;
+            client.exception = null;
 
             try {
-                switch (state) {
+                switch (client.state) {
 <?php foreach ($states as $state): ?>
                     case <?php echo cconst($state['name']) ?>:
-                        switch (event) {
+                        switch (client.event) {
 <?php     foreach (resolve_events($class, $state) as $event): ?>
 <?php         if ((string) $event['name'] != '*'): ?>
                             case <?php echo cconst($event['name']) ?>: {
 <?php         else: ?>
                             default: {
 <?php         endif; ?>
-<?php             foreach ($event->action as $action): ?>
-<?php                 switch ((string) $action['name']): ?>
-<?php                     case 'send': ?>
+<?php         foreach ($event->action as $action): ?>
+<?php             switch ((string) $action['name']): ?>
+<?php                 case 'send': ?>
                                 socket.send(socket.getCodec().get<?php echo jclass($action['message']) ?>());
-<?php                         break; ?>
-<?php                     case 'recv': ?>
-<?php                         $message = $messages[(string) $action['message']]; ?>
-                                Message <?php echo jvar($message['name']) ?> = new Message("<?php echo $message['name'] ?>");
-<?php foreach ($message->field as $field): ?>
-                                <?php echo jvar($message['name']) ?>.add<?php echo get_pushpop_method($field) ?>(socket.getCodec().get<?php echo jclass($message['name']) ?>().get<?php echo jclass($field['name']) ?>());
-<?php endforeach; ?>
-                                inbox.send(<?php echo jvar($message['name']) ?>);
-<?php                         break; ?>
-<?php                     case 'stop': ?>
+<?php                     break; ?>
+<?php                 case 'stop': ?>
                                 stop();
-<?php                         break; ?>
-<?php                     default: ?>
-                                handler.<?php echo jvar($action['name']) ?>(this);
-<?php                         break; ?>
-<?php                 endswitch; ?>
-<?php             endforeach; ?>
-<?php             if ($event['next']): ?>
-                                state = State.<?php echo cconst($event['next']) ?>;
-<?php             endif; ?>
-<?php             if ($event['trigger']): ?>
-                                next = Event.<?php echo cconst($event['trigger']) ?>;
-<?php             endif; ?>
+<?php                     break; ?>
+<?php                 default: ?>
+                                handler.<?php echo jvar($action['name']) ?>(client);
+<?php                     break; ?>
+<?php             endswitch; ?>
+<?php         endforeach; ?>
+<?php         if ($event['next']): ?>
+                                client.state = State.<?php echo cconst($event['next']) ?>;
+<?php         endif; ?>
+<?php         if ($event['trigger']): ?>
+                                client.next = Event.<?php echo cconst($event['trigger']) ?>;
+<?php         endif; ?>
                                 break;
                             }
 <?php     endforeach; ?>
@@ -373,7 +257,7 @@ public class <?php echo $client_class ?>Agent {
 <?php endforeach; ?>
                 }
             } catch (HaltException ex) {
-                next = exception;
+                client.next = client.exception;
             }
         }
     }
@@ -397,14 +281,169 @@ public class <?php echo $client_class ?>Agent {
     }
 
     /**
+     * Connected client.
+     */
+    public class Client {
+        private String identity;
+        private Frame address;
+        private int clientId;
+        private State state = State.START;
+        private Event event;
+        private Event next;
+        private Event exception;
+        private Event wakeup;
+        private LoopHandler wakeupHandler;
+<?php if (array_search('expired', $events)): ?>
+        private long expiry;
+        private LoopHandler expiryHandler;
+<?php endif; ?>
+
+        /**
+         * @return The client's identity
+         */
+        public String getIdentity() {
+            return identity;
+        }
+
+        /**
+         * @return The client's address
+         */
+        public Frame getAddress() {
+            return address;
+        }
+
+        /**
+         * @return The client's identifier counter
+         */
+        public int getClientId() {
+            return clientId;
+        }
+
+        /**
+         * @return The current state
+         */
+        public State getState() {
+            return state;
+        }
+
+        /**
+         * @return The current event being handled by the state machine
+         */
+        public Event getEvent() {
+            return event;
+        }
+
+        /**
+         * @return The next event to be handled by the state machine
+         */
+        public Event getNext() {
+            return next;
+        }
+
+        /**
+         * Set (trigger) the next event to be handled by the state machine.
+         *
+         * @param next The next event
+         */
+        public void triggerEvent(Event next) {
+            this.next = next;
+        }
+
+        /**
+         * Set (trigger) the next event to be handled by the state machine for
+         * a specified client.
+         *
+         * @param client The client on which to trigger the event
+         * @param next The next event for that client
+         */
+        public void sendEvent(Client client, Event next) {
+            executeInternal(client, next);
+        }
+
+        /**
+         * Set (trigger) the next event to be handled by the state machine for
+         * all clients.
+         *
+         * @param next The next event for that client
+         */
+        public void broadcastEvent(Event next) {
+            for (Client client : clients.values()) {
+                executeInternal(client, next);
+            }
+        }
+
+        /**
+         * Raise an exception, halting any actions in progress.
+         * <p>
+         * Continues execution of actions defined for the exception event.
+         *
+         * @param event The exception event
+         */
+        public void setException(Event event) {
+            this.exception = event;
+            throw new HaltException();
+        }
+
+        /**
+         * Set a wakeup alarm.
+         * <p>
+         * The next state should handle the wakeup event. The alarm is cancelled on
+         * any other event.
+         *
+         * @param wakeup The wakeup timer in milliseconds
+         * @param event The event to trigger when the wakeup timer expires
+         */
+        public void setWakeup(long wakeup, Event event) {
+            this.wakeup = event;
+            if (wakeupHandler != null) {
+                reactor.cancel(wakeupHandler);
+                wakeupHandler = null;
+            }
+            if (wakeup > 0) {
+                wakeupHandler = new WakeupHandler(this);
+                reactor.addTimer(wakeup, 1, wakeupHandler);
+            }
+        }
+<?php if (array_search('expired', $events)): ?>
+
+        /**
+         * Set an expiry timer.
+         * <p>
+         * Setting a non-zero expiry causes the state machine to receive an "expired"
+         * event if there is no incoming traffic for that many milliseconds.
+         * <p>
+         * This cycles over and over until/unless the code sets a zero expiry. The
+         * state machine must handle the "expired" event.
+         *
+         * @param expiry The expiry timer in milliseconds
+         */
+        public void setExpiry(long expiry) {
+            this.expiry = expiry;
+            if (expiryHandler != null) {
+                reactor.cancel(expiryHandler);
+                expiryHandler = null;
+            }
+            if (expiry > 0) {
+                expiryHandler = new ExpiryHandler(this);
+                reactor.addTimer(expiry, 1, expiryHandler);
+            }
+        }
+<?php endif; ?>
+    }
+
+    /**
+     * Signal exception to break out of processing current state.
+     */
+    private static class HaltException extends RuntimeException {
+        // Nothing
+    }
+
+    /**
      * Handler for commands from interface.
      */
     private class PipeHandler extends LoopAdapter {
         @Override
         protected void execute(Reactor reactor, Socket socket) {
-            // Clean up any previous data
-            parameters.clear();
-
             Message message = socket.receiveMessage();
             String method = message.popString();
             switch (method) {
@@ -417,14 +456,16 @@ public class <?php echo $client_class ?>Agent {
                 case "SET VERBOSE":
                     verbose = message.popInt() > 0;
                     break;
-<?php foreach ($class->method as $method): ?>
-                case "<?php echo strtoupper($method['name']) ?>":
-<?php     foreach ($method->field as $field): ?>
-                    parameters.put("<?php echo $field['name'] ?>", message.pop<?php echo get_pushpop_method($field) ?>());
-<?php     endforeach; ?>
-                    executeInternal(Event.<?php echo cconst($method['name']) ?>);
+                case "BIND":
+                    port = bind(message.popString());
+                    socket.send(new Message(port));
                     break;
-<?php endforeach; ?>
+                case "PORT":
+                    socket.send(new Message(port));
+                    break;
+                default:
+                    socket.send(handler.handleCommand(method, message));
+                    break;
             }
         }
     }
@@ -441,21 +482,9 @@ public class <?php echo $client_class ?>Agent {
                 case "$FLUSH":
                     pipe.send(new Message("OK"));
                     break;
-<?php foreach ($class->send->message as $method): ?>
-<?php     $message = $messages[(string) $method['name']]; ?>
-                case "<?php echo $message['name'] ?>": {
-                    <?php echo jclass($message['name']) ?>Message outgoing = new <?php echo jclass($message['name']) ?>Message();
-<?php     foreach ($message->field as $field): ?>
-<?php         if (get_pushpop_method($field) == 'Frames'): ?>
-                    outgoing.set<?php echo jclass($field['name']) ?>(message);
-<?php         else: ?>
-                    outgoing.set<?php echo jclass($field['name']) ?>(message.pop<?php echo get_pushpop_method($field) ?>());
-<?php         endif; ?>
-<?php     endforeach; ?>
-                    getSocket().send(outgoing);
+                case "SEND":
+                    getSocket().getSocket().send(message); // TODO
                     break;
-                }
-<?php endforeach; ?>
             }
         }
     }
@@ -463,25 +492,35 @@ public class <?php echo $client_class ?>Agent {
     /**
      * Handler for messages from server.
      */
-    private class DealerHandler extends LoopAdapter {
+    private class RouterHandler extends LoopAdapter {
         @Override
         protected void execute(Reactor reactor, Socket socket) {
             // We will process as many messages as we can, to reduce the overhead
             // of polling and the reactor.
             <?php echo $proto_class ?>Codec.MessageType messageType;
             while ((messageType = getSocket().receive(MessageFlag.DONT_WAIT)) != null) {
+                Frame address = getSocket().getAddress();
+                String identity = address.toString();
+                Client client = clients.get(identity);
+                if (client == null) {
+                    client = new Client();
+                    client.address = address;
+                    client.identity = identity;
+                    clients.put(identity, client);
+                }
 <?php if (array_search('expired', $events)): ?>
+
                 // Any input from server counts as activity
-                if (expiryHandler != null) {
-                    reactor.cancel(expiryHandler);
-                    if (expiry > 0) {
-                        reactor.addTimer(expiry, 1, expiryHandler);
+                if (client.expiryHandler != null) {
+                    reactor.cancel(client.expiryHandler);
+                    if (client.expiry > 0) {
+                        reactor.addTimer(client.expiry, 1, client.expiryHandler);
                     }
                 }
-
 <?php endif; ?>
+
                 Event event = event(messageType);
-                executeInternal(event);
+                executeInternal(client, event);
             }
         }
     }
@@ -490,11 +529,17 @@ public class <?php echo $client_class ?>Agent {
      * Handler for wakeup timer.
      */
     private class WakeupHandler extends LoopAdapter {
+        private Client client;
+
+        public WakeupHandler(Client client) {
+            this.client = client;
+        }
+
         @Override
         protected void execute(Reactor reactor, Socket socket) {
-            Event event = wakeup;
-            wakeup = null;
-            executeInternal(event);
+            Event event = client.wakeup;
+            client.wakeup = null;
+            executeInternal(client, event);
         }
     }
 <?php if (array_search('expired', $events)): ?>
@@ -503,11 +548,17 @@ public class <?php echo $client_class ?>Agent {
      * Handler for expiry timer.
      */
     private class ExpiryHandler extends LoopAdapter {
+        private Client client;
+
+        public ExpiryHandler(Client client) {
+            this.client = client;
+        }
+
         @Override
         protected void execute(Reactor reactor, Socket socket) {
-            executeInternal(Event.EXPIRED);
-            if (!terminated && expiry > 0) {
-                reactor.addTimer(expiry, 1, this);
+            executeInternal(client, Event.EXPIRED);
+            if (!terminated && client.expiry > 0) {
+                reactor.addTimer(client.expiry, 1, this);
             }
         }
     }
@@ -527,16 +578,12 @@ public class <?php echo $client_class ?>Agent {
         }
     }
 <?php endif; ?>
-
-    private static class HaltException extends RuntimeException {
-        // Nothing
-    }
 }
-<?php output("../src/main/java/${path}/${client_class}.java") ?>
+<?php output("../src/main/java/${path}/${server_class}.java") ?>
 /* =============================================================================
- * <?php echo $client_class ?>.java
+ * <?php echo $server_class ?>.java
  *
- * Generated class for <?php echo $client_class ?>.
+ * Generated class for <?php echo $server_class ?>.
  * -----------------------------------------------------------------------------
  * <?php echo nl(block_comment($class['license'])) ?>
  * =============================================================================
@@ -549,66 +596,59 @@ import org.zeromq.api.Message;
 import org.zeromq.api.Socket;
 import org.zeromq.api.SocketType;
 
-import java.util.Arrays;
-
 /**
- * <?php echo $client_class ?> class.
+ * <?php echo $server_class ?> class.
  * <p>
  * <?php echo trim((string) $class) ?>.
  *
  * @author <?php echo nl(get_current_user()) ?>
  */
-public class <?php echo $client_class ?> {
+public class <?php echo $server_class ?> {
     // Structure of our class
     private Context context;
     private Socket pipe;
-    private Socket inbox;
-    private <?php echo $client_class ?>Agent agent;
-
-    // Fields received in messages and replies
-<?php foreach (array_values($fields) as $field): ?>
-    private <?php echo get_parameter_type($field) ?> <?php echo jvar($field['name']) ?>;
-<?php endforeach; ?>
+    private <?php echo $server_class ?>Agent agent;
 
     /**
-     * Create a <?php echo $client_class ?>.
+     * Create a <?php echo $server_class ?>.
      *
      * @param handler The application callback handler
      */
-    public <?php echo $client_class ?>(<?php echo $client_class ?>Handler handler) {
+    public <?php echo $server_class ?>(<?php echo $server_class ?>Handler handler) {
         this(ContextFactory.createContext(1), handler);
     }
 
     /**
-     * Create a <?php echo $client_class ?>.
+     * Create a <?php echo $server_class ?>.
      *
      * @param context The 0MQ context
      * @param handler The application callback handler
      */
-    public <?php echo $client_class ?>(Context context, <?php echo $client_class ?>Handler handler) {
+    public <?php echo $server_class ?>(Context context, <?php echo $server_class ?>Handler handler) {
         this.context = context;
-        this.agent = new <?php echo $client_class ?>Agent(context, handler);
+        this.agent = new <?php echo $server_class ?>Agent(context, handler);
         this.pipe = context.buildSocket(SocketType.PAIR).connect(String.format("inproc://pipe-%s", agent.toString()));
-        this.inbox = context.buildSocket(SocketType.PAIR).connect(String.format("inproc://inbox-%s", agent.toString()));
     }
-<?php foreach (array_values($fields) as $field): ?>
 
     /**
-     * @return Last received <?php echo nl($field['name']) ?>
-     */
-    public <?php echo get_parameter_type($field) ?> get<?php echo jclass($field['name']) ?>() {
-        return <?php echo jvar($field['name']) ?>;
-    }
-<?php endforeach; ?>
-
-    /**
-     * Ask the background agent if it is connected to the server.
+     * Bind to the given endpoint.
      *
-     * @return true if the background agent is connected to the server, false otherwise
+     * @param endpoint The endpoint to bind to
+     * @return The ephemeral port that is bound to if ephemeral, else 0
      */
-    public boolean isConnected() {
-        pipe.send(new Message("$CONNECTED"));
-        return pipe.receiveMessage().popInt() > 0;
+    public int bind(String endpoint) {
+        pipe.send(new Message("BIND").addString(endpoint));
+        return pipe.receiveMessage().popInt();
+    }
+
+    /**
+     * Ask the background agent what port it is bound to.
+     *
+     * @return The port that the background agent is bound to
+     */
+    public int getPort() {
+        pipe.send(new Message("PORT"));
+        return pipe.receiveMessage().popInt();
     }
 
     /**
@@ -619,133 +659,57 @@ public class <?php echo $client_class ?> {
     public void setVerbose(boolean verbose) {
         pipe.send(new Message(verbose ? 1 : 0));
     }
-<?php foreach ($class->method as $method): ?>
 
     /**
-     * <?php echo nl(block_comment($method, 4)) ?>
-<?php     if ($method['return']): ?>
+     * Send a custom command to the background agent.
      *
-     * @return The <?php echo jvar($method['return']) ?> field of the reply
-<?php     endif; ?>
+     * @param command The command to execute
+     * @param message The message to send
+     * @return The reply from the background agent
      */
-    public <?php echo get_parameter_type($fields[(string) $method['return']]) ?> <?php echo jvar($method['name']) ?>
-(<?php    foreach (array_of($method->field) as $i => $field): ?>
-<?php echo (first($i)) ? '' : ', ' ?>
-<?php echo get_parameter_type($field) ?> <?php echo jvar($field['name']) ?>
-<?php     endforeach; ?>
-) {
-        Message message = new Message("<?php echo strtoupper($method['name']) ?>");
-<?php     foreach (array_of($method->field) as $i => $field): ?>
-        message.add<?php echo get_pushpop_method($field) ?>(<?php echo jvar($field['name']) ?>);
-<?php     endforeach; ?>
-        pipe.send(message);
-<?php     if ($method->accept): ?>
-        accept(<?php foreach (array_of($method->accept) as $i => $accept): ?><?php if (!first($i)): ?>, <?php endif; ?>"<?php echo $accept['reply'] ?>"<?php endforeach; ?>);
-<?php     endif; ?>
-<?php     if ($method['return']): ?>
-
-        return <?php echo jvar($method['return']) ?>;
-<?php     endif; ?>
-    }
-<?php endforeach; ?>
-
-    private void accept(String... replies) {
-        Message message = pipe.receiveMessage();
-        String reply = message.popString();
-        assert Arrays.asList(replies).contains(reply);
-        switch (reply) {
-<?php foreach ($replies as $reply): ?>
-            case "<?php echo $reply['name'] ?>":
-<?php     foreach ($reply->field as $field): ?>
-                <?php echo jvar($field['name']) ?> = message.pop<?php echo get_pushpop_method($field) ?>();
-<?php     endforeach; ?>
-                break;
-<?php endforeach; ?>
-        }
-    }
-<?php foreach ($send as $method): ?>
-<?php $message = $messages[(string) $method['name']]; ?>
-
-    /**
-     * Send a <?php echo $method['name'] ?> message to the server.
-     */
-    public void <?php echo jvar($method['method']) ?>
-(<?php    foreach (array_of($message->field) as $i => $field): ?>
-<?php echo (first($i)) ? '' : ', ' ?>
-<?php echo get_parameter_type($field) ?> <?php echo jvar($field['name']) ?>
-<?php     endforeach; ?>
-) {
-        Message message = new Message("<?php echo $method['name'] ?>");
-<?php foreach ($message->field as $field): ?>
-        message.add<?php echo get_pushpop_method($field) ?>(<?php echo jvar($field['name']) ?>);
-<?php endforeach; ?>
-
-        inbox.send(message);
-    }
-<?php endforeach; ?>
-
-    /**
-     * Receive a message from the server.
-     *
-     * @return The MessageType of the message
-     */
-    public MessageType receive() {
-        Message message = inbox.receiveMessage();
-        MessageType type = MessageType.valueOf(message.popString());
-        switch (type) {
-<?php foreach ($recv as $method): ?>
-<?php $message = $messages[(string) $method['name']]; ?>
-            case <?php echo cconst($method['name']) ?>:
-<?php foreach ($message->field as $field): ?>
-<?php         if (get_pushpop_method($field) == 'Frames'): ?>
-                <?php echo jvar($field['name']) ?> = message;
-<?php         else: ?>
-                <?php echo jvar($field['name']) ?> = message.pop<?php echo get_pushpop_method($field) ?>();
-<?php         endif; ?>
-<?php endforeach; ?>
-                break;
-<?php endforeach; ?>
-        }
-
-        return type;
-    }
-
-    /**
-     * Enumeration of message types.
-     */
-    public enum MessageType {
-<?php foreach ($recv as $i => $method): ?>
-        <?php echo cconst($method['name']) ?><?php echo last($recv, $i) ? nl() : nl(',') ?>
-<?php endforeach; ?>
+    public Message execute(String command, Message message) {
+        pipe.send(new Message(command).addFrames(message));
+        return pipe.receiveMessage();
     }
 }
-<?php output("../src/main/java/${path}/${client_class}Handler.java") ?>
+<?php output("../src/main/java/${path}/${server_class}Handler.java") ?>
 /* =============================================================================
- * <?php echo $client_class ?>.java
+ * <?php echo $server_class ?>.java
  *
- * Generated class for <?php echo $client_class ?>.
+ * Generated class for <?php echo $server_class ?>.
  * -----------------------------------------------------------------------------
  * <?php echo nl(block_comment($class['license'])) ?>
  * =============================================================================
  */
 package <?php echo package($class['package']) ?>;
 
+import org.zeromq.api.Message;
+
 /**
- * <?php echo $client_class ?>Handler interface.
+ * <?php echo $server_class ?>Handler interface.
  * <p>
  * The application callback handler interface which performs actions on behalf
  * of background agent.
  *
  * @author <?php echo nl(get_current_user()) ?>
  */
-public interface <?php echo $client_class ?>Handler {
+public interface <?php echo $server_class ?>Handler {
 <?php foreach ($actions as $i => $action): ?>
 <?php echo !first($i) ? nl() : '' ?>
     /**
      * <?php echo nl(ccomment($action)) ?>
      *
-     * @param agent Handle to the background agent
+     * @param client Handle to the current client
      */
-    void <?php echo jvar($action) ?>(<?php echo $client_class ?>Agent agent);
+    void <?php echo jvar($action) ?>(<?php echo $server_class ?>Agent.Client client);
 <?php endforeach; ?>
+
+    /**
+     * Handle a custom command from the application.
+     *
+     * @param command The command to execute
+     * @param message The message
+     * @return A reply to send
+     */
+    Message handleCommand(String command, Message message);
 }

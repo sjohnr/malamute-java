@@ -135,6 +135,9 @@ public class <?php echo $client_class ?>Agent {
             inbox = null;
             socket = null;
             reactor = null;
+            verbose = false;
+            terminated = false;
+            connected = false;
         }
     }
 
@@ -198,10 +201,11 @@ public class <?php echo $client_class ?>Agent {
      * @param wakeup The wakeup timer in milliseconds
      * @param event The event to trigger when the wakeup timer expires
      */
-    public void setWakeupEvent(long wakeup, Event event) {
+    public void setWakeup(long wakeup, Event event) {
         this.wakeup = event;
         if (wakeupHandler != null) {
             reactor.cancel(wakeupHandler);
+            wakeupHandler = null;
         }
         if (wakeup > 0) {
             wakeupHandler = new WakeupHandler();
@@ -225,9 +229,12 @@ public class <?php echo $client_class ?>Agent {
         this.heartbeat = heartbeat;
         if (heartbeatHandler != null) {
             reactor.cancel(heartbeatHandler);
+            heartbeatHandler = null;
         }
-        heartbeatHandler = new HeartbeatHandler();
-        reactor.addTimer(heartbeat, 1, heartbeatHandler);
+        if (heartbeat > 0) {
+            heartbeatHandler = new HeartbeatHandler();
+            reactor.addTimer(heartbeat, 1, heartbeatHandler);
+        }
     }
 <?php endif; ?>
 <?php if (array_search('expired', $events)): ?>
@@ -247,6 +254,7 @@ public class <?php echo $client_class ?>Agent {
         this.expiry = expiry;
         if (expiryHandler != null) {
             reactor.cancel(expiryHandler);
+            expiryHandler = null;
         }
         if (expiry > 0) {
             expiryHandler = new ExpiryHandler();
@@ -338,33 +346,33 @@ public class <?php echo $client_class ?>Agent {
 <?php         else: ?>
                             default: {
 <?php         endif; ?>
-<?php             foreach ($event->action as $action): ?>
-<?php                 switch ((string) $action['name']): ?>
-<?php                     case 'send': ?>
+<?php         foreach ($event->action as $action): ?>
+<?php             switch ((string) $action['name']): ?>
+<?php                 case 'send': ?>
                                 socket.send(socket.getCodec().get<?php echo jclass($action['message']) ?>());
-<?php                         break; ?>
-<?php                     case 'recv': ?>
+<?php                     break; ?>
+<?php                 case 'recv': ?>
 <?php                         $message = $messages[(string) $action['message']]; ?>
                                 Message <?php echo jvar($message['name']) ?> = new Message("<?php echo $message['name'] ?>");
-<?php foreach ($message->field as $field): ?>
+<?php                     foreach ($message->field as $field): ?>
                                 <?php echo jvar($message['name']) ?>.add<?php echo get_pushpop_method($field) ?>(socket.getCodec().get<?php echo jclass($message['name']) ?>().get<?php echo jclass($field['name']) ?>());
-<?php endforeach; ?>
+<?php                     endforeach; ?>
                                 inbox.send(<?php echo jvar($message['name']) ?>);
-<?php                         break; ?>
-<?php                     case 'stop': ?>
+<?php                     break; ?>
+<?php                 case 'stop': ?>
                                 stop();
-<?php                         break; ?>
-<?php                     default: ?>
+<?php                     break; ?>
+<?php                 default: ?>
                                 handler.<?php echo jvar($action['name']) ?>(this);
-<?php                         break; ?>
-<?php                 endswitch; ?>
-<?php             endforeach; ?>
-<?php             if ($event['next']): ?>
+<?php                     break; ?>
+<?php             endswitch; ?>
+<?php         endforeach; ?>
+<?php         if ($event['next']): ?>
                                 state = State.<?php echo cconst($event['next']) ?>;
-<?php             endif; ?>
-<?php             if ($event['trigger']): ?>
+<?php         endif; ?>
+<?php         if ($event['trigger']): ?>
                                 next = Event.<?php echo cconst($event['trigger']) ?>;
-<?php             endif; ?>
+<?php         endif; ?>
                                 break;
                             }
 <?php     endforeach; ?>
@@ -394,6 +402,13 @@ public class <?php echo $client_class ?>Agent {
 <?php foreach ($events as $i => $state): ?>
         <?php echo cconst($state) ?><?php echo last($events, $i) ? nl() : nl(',') ?>
 <?php endforeach; ?>
+    }
+
+    /**
+     * Signal exception to break out of processing current state.
+     */
+    private static class HaltException extends RuntimeException {
+        // Nothing
     }
 
     /**
@@ -527,10 +542,6 @@ public class <?php echo $client_class ?>Agent {
         }
     }
 <?php endif; ?>
-
-    private static class HaltException extends RuntimeException {
-        // Nothing
-    }
 }
 <?php output("../src/main/java/${path}/${client_class}.java") ?>
 /* =============================================================================
@@ -591,6 +602,15 @@ public class <?php echo $client_class ?> {
         this.pipe = context.buildSocket(SocketType.PAIR).connect(String.format("inproc://pipe-%s", agent.toString()));
         this.inbox = context.buildSocket(SocketType.PAIR).connect(String.format("inproc://inbox-%s", agent.toString()));
     }
+
+    /**
+     * Destroy the client.
+     */
+    public void close() {
+        pipe.send(new Message("$TERM"));
+        
+    }
+
 <?php foreach (array_values($fields) as $field): ?>
 
     /**
@@ -697,11 +717,11 @@ public class <?php echo $client_class ?> {
 <?php $message = $messages[(string) $method['name']]; ?>
             case <?php echo cconst($method['name']) ?>:
 <?php foreach ($message->field as $field): ?>
-<?php         if (get_pushpop_method($field) == 'Frames'): ?>
+<?php     if (get_pushpop_method($field) == 'Frames'): ?>
                 <?php echo jvar($field['name']) ?> = message;
-<?php         else: ?>
+<?php     else: ?>
                 <?php echo jvar($field['name']) ?> = message.pop<?php echo get_pushpop_method($field) ?>();
-<?php         endif; ?>
+<?php     endif; ?>
 <?php endforeach; ?>
                 break;
 <?php endforeach; ?>

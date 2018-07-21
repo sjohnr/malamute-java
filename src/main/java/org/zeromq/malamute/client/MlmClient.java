@@ -67,6 +67,15 @@ public class MlmClient {
     }
 
     /**
+     * Destroy the client.
+     */
+    public void close() {
+        pipe.send(new Message("$TERM"));
+        
+    }
+
+
+    /**
      * @return Last received sender
      */
     public String getSender() {

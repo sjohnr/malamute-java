@@ -107,6 +107,9 @@ public class MlmClientAgent {
             inbox = null;
             socket = null;
             reactor = null;
+            verbose = false;
+            terminated = false;
+            connected = false;
         }
     }
 
@@ -170,10 +173,11 @@ public class MlmClientAgent {
      * @param wakeup The wakeup timer in milliseconds
      * @param event The event to trigger when the wakeup timer expires
      */
-    public void setWakeupEvent(long wakeup, Event event) {
+    public void setWakeup(long wakeup, Event event) {
         this.wakeup = event;
         if (wakeupHandler != null) {
             reactor.cancel(wakeupHandler);
+            wakeupHandler = null;
         }
         if (wakeup > 0) {
             wakeupHandler = new WakeupHandler();
@@ -196,9 +200,12 @@ public class MlmClientAgent {
         this.heartbeat = heartbeat;
         if (heartbeatHandler != null) {
             reactor.cancel(heartbeatHandler);
+            heartbeatHandler = null;
         }
-        heartbeatHandler = new HeartbeatHandler();
-        reactor.addTimer(heartbeat, 1, heartbeatHandler);
+        if (heartbeat > 0) {
+            heartbeatHandler = new HeartbeatHandler();
+            reactor.addTimer(heartbeat, 1, heartbeatHandler);
+        }
     }
 
     /**
@@ -216,6 +223,7 @@ public class MlmClientAgent {
         this.expiry = expiry;
         if (expiryHandler != null) {
             reactor.cancel(expiryHandler);
+            expiryHandler = null;
         }
         if (expiry > 0) {
             expiryHandler = new ExpiryHandler();
@@ -940,6 +948,13 @@ public class MlmClientAgent {
     }
 
     /**
+     * Signal exception to break out of processing current state.
+     */
+    private static class HaltException extends RuntimeException {
+        // Nothing
+    }
+
+    /**
      * Handler for commands from interface.
      */
     private class PipeHandler extends LoopAdapter {
@@ -1099,9 +1114,5 @@ public class MlmClientAgent {
                 reactor.addTimer(heartbeat, 1, this);
             }
         }
-    }
-
-    private static class HaltException extends RuntimeException {
-        // Nothing
     }
 }
