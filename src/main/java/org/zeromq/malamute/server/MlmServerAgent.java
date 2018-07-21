@@ -786,25 +786,6 @@ public class MlmServerAgent {
     }
 
     /**
-     * Handler for messages from interface.
-     */
-    private class InboxHandler extends LoopAdapter {
-        @Override
-        protected void execute(Reactor reactor, Socket socket) {
-            Message message = socket.receiveMessage();
-            String method = message.popString();
-            switch (method) {
-                case "$FLUSH":
-                    pipe.send(new Message("OK"));
-                    break;
-                case "SEND":
-                    getSocket().getSocket().send(message); // TODO
-                    break;
-            }
-        }
-    }
-
-    /**
      * Handler for messages from server.
      */
     private class RouterHandler extends LoopAdapter {
